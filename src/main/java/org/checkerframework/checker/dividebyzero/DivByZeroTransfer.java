@@ -75,9 +75,78 @@ public class DivByZeroTransfer extends CFTransfer {
    * @return a refined type for lhs
    */
   private AnnotationMirror refineLhsOfComparison(
-      Comparison operator, AnnotationMirror lhs, AnnotationMirror rhs) {
-    // TODO
-    return lhs;
+    Comparison operator, AnnotationMirror lhs, AnnotationMirror rhs) {
+    AnnotationMirror result = bottom();
+    switch (operator) {
+      case LT:
+        // anything less than zero or negative is negative
+        if (isType(rhs, Zero.class) || isType(rhs, Negative.class)) {
+          result = reflect(Negative.class);
+        }
+        // anything less than top / positive / NZ is unknown
+        else if (rhs == top() || isType(rhs, Positive.class) || isType(rhs, NonZero.class)) {
+          result = top();
+        }
+        // bottom is empty
+        else if (rhs == bottom()) {
+          result = rhs;
+        }
+        break;
+      case GT:
+        if (isType(rhs, Zero.class) || isType(rhs, Positive.class)) {
+          result = reflect(Positive.class);
+        }
+        else if (rhs == top() || isType(rhs, NonZero.class) || isType(rhs, Negative.class)) {
+          result = top();
+        }
+        else if (rhs == bottom()) {
+          result = rhs;
+        }
+        break;
+      case NE:
+        // if x != 0, x == nz
+        if(isType(rhs, Zero.class)) {
+          result = reflect(NonZero.class);
+        }
+        else {
+          result = glb(rhs, lhs);
+        }
+        break;
+      case EQ:
+        result = lub(rhs, lhs);
+        break;
+      case GE:
+        if (isType(rhs, Positive.class)) {
+          result = rhs;
+        }
+        else if (rhs == bottom()) {
+          result = bottom();
+        }
+        else {
+          result = top();
+        }
+        break;
+      case LE:
+        if (isType(rhs, Negative.class)) {
+          result = rhs;
+        }
+        else if (rhs == bottom()) {
+          result = rhs;
+        }
+        else {
+          result = top();
+        }
+        break;
+      default:
+        // default - we dunno
+        result = lub(rhs, lhs);
+        break;
+    }
+    return result;
+  }
+
+  private boolean isType(AnnotationMirror anm, Class<? extends Annotation> c) {
+    return analysis.getTypeFactory().areSameByClass(anm, c);
   }
 
   /**
@@ -97,10 +166,140 @@ public class DivByZeroTransfer extends CFTransfer {
    */
   private AnnotationMirror arithmeticTransfer(
       BinaryOperator operator, AnnotationMirror lhs, AnnotationMirror rhs) {
-    // TODO
+    switch (operator) {
+      case PLUS:
+        return plusTransfer(lhs, rhs);
+      case MINUS:
+        return minusTransfer(lhs, rhs);
+      case TIMES:
+        return timesTransfer(lhs, rhs);
+      case DIVIDE:
+        return divideTransfer(lhs, rhs);
+      case MOD:
+        return modTransfer(lhs, rhs);
+    }
     return top();
   }
 
+
+  private AnnotationMirror plusTransfer(AnnotationMirror lhs, AnnotationMirror rhs) {
+    // if either are bottom, return bottom
+    if(rhs == bottom() || lhs == bottom()) {
+      return bottom();
+    }
+    // if either are top, return top
+    else if(rhs == top() || lhs == top()) {
+      return top();
+    }
+    // if positive lhs, return positive if rhs is positive or zero, else top
+    else if(isType(lhs, Positive.class)) {
+      return (isType(rhs, Positive.class) || isType(rhs, Zero.class)) ? reflect(Positive.class) : top();
+    }
+    // if negative lhs, return hegative if rhs is negative or zero, else top
+    else if(isType(lhs, Negative.class)) {
+      return (isType(rhs, Negative.class) || isType(rhs, Zero.class)) ? reflect(Negative.class) : top();
+    }
+    // zero plus anything is that anything
+    else if(isType(lhs, Zero.class)) {
+      return rhs;
+    }
+    // otherwise we don't know
+    else return top();
+  }
+
+  private AnnotationMirror minusTransfer(AnnotationMirror lhs, AnnotationMirror rhs) {
+    // if either are bottom, return bottom
+    if(rhs == bottom() || lhs == bottom()) {
+      return bottom();
+    }
+    // if either are top, return top
+    else if(rhs == top() || lhs == top()) {
+      return top();
+    }
+    // if positive lhs, return positive if rhs is negative or zero, else top
+    else if(isType(lhs, Positive.class)) {
+      return (isType(rhs, Negative.class) || isType(rhs, Zero.class)) ? reflect(Positive.class) : top();
+    }
+    // if negative lhs, return negative if rhs is positive or zero, else top
+    else if(isType(lhs, Negative.class)) {
+      return (isType(rhs, Positive.class) || isType(rhs, Zero.class)) ? reflect(Negative.class) : top();
+    }
+    // zero minus something
+    else if(isType(lhs, Zero.class)) {
+      // 0 - 0 == 0
+      if(isType(rhs, Zero.class)) {
+        return reflect(Zero.class);
+      }
+      // zero - neg == pos, zero - pos == neg
+      else return reflect(isType(rhs, Positive.class) ? Negative.class : Positive.class);
+    }
+    // otherwise we don't know
+    else return top();
+  }
+
+  private AnnotationMirror timesTransfer(AnnotationMirror lhs, AnnotationMirror rhs) {
+    // if either are bottom, return bottom
+    if(rhs == bottom() || lhs == bottom()) {
+      return bottom();
+    }
+    // if either are zero, return zero
+    else if(isType(rhs, Zero.class) || isType(lhs, Zero.class)) {
+      return reflect(Zero.class);
+    }
+    // negative * (+, -, nz, t)
+    else if(isType(lhs, Negative.class)) {
+      // - * (nz, t) == t
+      if(isType(rhs, NonZero.class) || rhs == top()) {
+        return top();
+      }
+      else return (isType(rhs, Negative.class)) ? reflect(Positive.class) : reflect(Negative.class);
+    }
+    // pos * (+, -, nz, t)
+    else if(isType(lhs, Positive.class)) {
+      // + * (nz, t) == t
+      if(isType(rhs, NonZero.class) || rhs == top()) {
+        return top();
+      }
+      else return (isType(rhs, Negative.class)) ? reflect(Negative.class) : reflect(Positive.class);
+    }
+    else return top();
+  }
+  private AnnotationMirror divideTransfer(AnnotationMirror lhs, AnnotationMirror rhs) {
+    // if either are bottom, or bottom has zero (T, 0), return error state (bottom)
+    if(rhs == bottom() || lhs == bottom() || rhs == top() || isType(rhs, Zero.class)) {
+      return bottom();
+    }
+    // T / anything == T
+    else if(lhs == top()) {
+      return top();
+    }
+    // positive / 
+    else if(isType(lhs, Positive.class)) {
+      if(isType(rhs, NonZero.class)) {
+        return top();
+      }
+      else return isType(rhs, Positive.class) ? reflect(Positive.class) : reflect(Negative.class);
+    }
+    // negative /
+    else if(isType(lhs, Negative.class)) {
+      if(isType(rhs, NonZero.class)) {
+        return top();
+      }
+      else return isType(rhs, Positive.class) ? reflect(Negative.class) : reflect(Positive.class);
+    }
+    else return top();
+  }
+  private AnnotationMirror modTransfer(AnnotationMirror lhs, AnnotationMirror rhs) {
+    // if either are bottom, or bottom has zero (T, 0), return error state (bottom)
+    if(rhs == bottom() || lhs == bottom() || rhs == top() || isType(rhs, Zero.class)) {
+      return bottom();
+    }
+    // T / anything == T
+    else if(lhs == top()) {
+      return top();
+    }
+    else return top();
+  }
   // ========================================================================
   // Useful helpers
 
