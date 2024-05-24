@@ -87,4 +87,19 @@ class AssignmentProvidedTests {
     // :: error: divide.by.zero
     int k = 1 / z;
   }
+  public static void m(int q) {
+    int x = q % 4;
+    // :: error: divide.by.zero
+    int h = q / x;
+
+    q += x;
+    q *= x;
+    q -= x;
+    // :: error: divide.by.zero
+    q %= (3 - 3);
+    // :: error: divide.by.zero
+    q %= x;
+    // :: error: divide.by.zero
+    q = (q <= 0) ? q / q : q / 2;
+  }
 }
