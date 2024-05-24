@@ -1,6 +1,7 @@
 package org.checkerframework.checker.dividebyzero;
 
 import com.sun.source.tree.*;
+import com.sun.source.tree.Tree.Kind;
 import java.lang.annotation.Annotation;
 import java.util.EnumSet;
 import java.util.Set;
@@ -28,8 +29,31 @@ public class DivByZeroVisitor extends BaseTypeVisitor<DivByZeroAnnotatedTypeFact
    */
   private boolean errorAt(BinaryTree node) {
     // A BinaryTree can represent any binary operator, including + or -.
-    // TODO
-    return false;
+    ExpressionTree left = node.getLeftOperand();
+    ExpressionTree right = node.getRightOperand();
+    Kind kind = node.getKind();
+    
+    boolean right_is_int = isInt(right);
+    boolean right_is_top = hasAnnotation(right, Top.class);
+    boolean right_is_zero = hasAnnotation(right, Zero.class);
+    boolean right_is_bottom = hasAnnotation(right, Bottom.class);
+    
+    boolean retVal = (
+      // error if left or right is null
+      left == null || right == null ||
+      // or we're doing integer division
+          (
+              right_is_int && DIVISION_OPERATORS.contains(kind) && (
+              // and right is top
+              right_is_top ||
+              // or it's bottom
+              right_is_bottom ||
+              // or it's zero
+              right_is_zero
+            )
+          )
+    );
+    return retVal;
   }
 
   /**
@@ -42,8 +66,31 @@ public class DivByZeroVisitor extends BaseTypeVisitor<DivByZeroAnnotatedTypeFact
   private boolean errorAt(CompoundAssignmentTree node) {
     // A CompoundAssignmentTree represents any binary operator combined with an assignment,
     // such as "x += 10".
-    // TODO
-    return false;
+    ExpressionTree right = node.getExpression();
+    ExpressionTree left = node.getVariable();
+    Kind kind = node.getKind();
+    
+    boolean right_is_int = isInt(right);
+    boolean right_is_top = hasAnnotation(right, Top.class);
+    boolean right_is_zero = hasAnnotation(right, Zero.class);
+    boolean right_is_bottom = hasAnnotation(right, Bottom.class);
+    
+    boolean retVal = (
+      // error if left or right is null
+      left == null || right == null ||
+      // or we're doing integer division
+          (
+              right_is_int && DIVISION_OPERATORS.contains(kind) && (
+              // and right is top
+              right_is_top ||
+              // or it's bottom
+              right_is_bottom ||
+              // or it's zero
+              right_is_zero
+            )
+          )
+    );
+    return retVal;
   }
 
   // ========================================================================
