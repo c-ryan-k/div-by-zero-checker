@@ -80,11 +80,11 @@ public class DivByZeroTransfer extends CFTransfer {
     switch (operator) {
       case LT:
         // anything less than zero or negative is negative
-        if (isType(rhs, Zero.class) || isType(rhs, Negative.class)) {
-          result = reflect(Negative.class);
+        if (equal(rhs, Zero()) || equal(rhs, Negative())) {
+          result = Negative();
         }
         // anything less than top / positive / NZ is unknown
-        else if (rhs == top() || isType(rhs, Positive.class) || isType(rhs, NonZero.class)) {
+        else if (rhs == top() || equal(rhs, Positive()) || equal(rhs, NonZero())) {
           result = top();
         }
         // bottom is empty
@@ -93,10 +93,10 @@ public class DivByZeroTransfer extends CFTransfer {
         }
         break;
       case GT:
-        if (isType(rhs, Zero.class) || isType(rhs, Positive.class)) {
-          result = reflect(Positive.class);
+        if (equal(rhs, Zero()) || equal(rhs, Positive())) {
+          result = Positive();
         }
-        else if (rhs == top() || isType(rhs, NonZero.class) || isType(rhs, Negative.class)) {
+        else if (rhs == top() || equal(rhs, NonZero()) || equal(rhs, Negative())) {
           result = top();
         }
         else if (rhs == bottom()) {
@@ -105,8 +105,8 @@ public class DivByZeroTransfer extends CFTransfer {
         break;
       case NE:
         // if x != 0, x == nz
-        if(isType(rhs, Zero.class)) {
-          result = reflect(NonZero.class);
+        if(equal(rhs, Zero())) {
+          result = NonZero();
         }
         else {
           result = glb(rhs, lhs);
@@ -116,7 +116,7 @@ public class DivByZeroTransfer extends CFTransfer {
         result = lub(rhs, lhs);
         break;
       case GE:
-        if (isType(rhs, Positive.class)) {
+        if (equal(rhs, Positive())) {
           result = rhs;
         }
         else if (rhs == bottom()) {
@@ -127,7 +127,7 @@ public class DivByZeroTransfer extends CFTransfer {
         }
         break;
       case LE:
-        if (isType(rhs, Negative.class)) {
+        if (equal(rhs, Negative())) {
           result = rhs;
         }
         else if (rhs == bottom()) {
@@ -145,10 +145,21 @@ public class DivByZeroTransfer extends CFTransfer {
     return result;
   }
 
-  private boolean isType(AnnotationMirror anm, Class<? extends Annotation> c) {
-    return analysis.getTypeFactory().areSameByClass(anm, c);
+  private AnnotationMirror Zero() {
+    return reflect(Zero.class);
   }
 
+  private AnnotationMirror Negative() {
+    return reflect(Negative.class);
+  }
+  
+  private AnnotationMirror Positive() {
+    return reflect(Positive.class);
+  }
+
+  private AnnotationMirror NonZero() {
+    return reflect(NonZero.class);
+  }
   /**
    * For an arithmetic expression (lhs `op` rhs), compute the point in the lattice for the result of
    * evaluating the expression. ("Top" is always a legal return value, but not a very useful one.)
@@ -192,15 +203,15 @@ public class DivByZeroTransfer extends CFTransfer {
       return top();
     }
     // if positive lhs, return positive if rhs is positive or zero, else top
-    else if(isType(lhs, Positive.class)) {
-      return (isType(rhs, Positive.class) || isType(rhs, Zero.class)) ? reflect(Positive.class) : top();
+    else if(equal(lhs, Positive())) {
+      return (equal(rhs, Positive()) || equal(rhs, Zero())) ? Positive() : top();
     }
     // if negative lhs, return hegative if rhs is negative or zero, else top
-    else if(isType(lhs, Negative.class)) {
-      return (isType(rhs, Negative.class) || isType(rhs, Zero.class)) ? reflect(Negative.class) : top();
+    else if(equal(lhs, Negative())) {
+      return (equal(rhs, Negative()) || equal(rhs, Zero())) ? Negative() : top();
     }
     // zero plus anything is that anything
-    else if(isType(lhs, Zero.class)) {
+    else if(equal(lhs, Zero())) {
       return rhs;
     }
     // otherwise we don't know
@@ -217,21 +228,21 @@ public class DivByZeroTransfer extends CFTransfer {
       return top();
     }
     // if positive lhs, return positive if rhs is negative or zero, else top
-    else if(isType(lhs, Positive.class)) {
-      return (isType(rhs, Negative.class) || isType(rhs, Zero.class)) ? reflect(Positive.class) : top();
+    else if(equal(lhs, Positive())) {
+      return (equal(rhs, Negative()) || equal(rhs, Zero())) ? Positive() : top();
     }
     // if negative lhs, return negative if rhs is positive or zero, else top
-    else if(isType(lhs, Negative.class)) {
-      return (isType(rhs, Positive.class) || isType(rhs, Zero.class)) ? reflect(Negative.class) : top();
+    else if(equal(lhs, Negative())) {
+      return (equal(rhs, Positive()) || equal(rhs, Zero())) ? Negative() : top();
     }
     // zero minus something
-    else if(isType(lhs, Zero.class)) {
+    else if(equal(lhs, Zero())) {
       // 0 - 0 == 0
-      if(isType(rhs, Zero.class)) {
-        return reflect(Zero.class);
+      if(equal(rhs, Zero())) {
+        return Zero();
       }
       // zero - neg == pos, zero - pos == neg
-      else return reflect(isType(rhs, Positive.class) ? Negative.class : Positive.class);
+      else return equal(rhs, Positive()) ? Negative() : Positive();
     }
     // otherwise we don't know
     else return top();
@@ -243,30 +254,30 @@ public class DivByZeroTransfer extends CFTransfer {
       return bottom();
     }
     // if either are zero, return zero
-    else if(isType(rhs, Zero.class) || isType(lhs, Zero.class)) {
-      return reflect(Zero.class);
+    else if(equal(rhs, Zero()) || equal(lhs, Zero())) {
+      return Zero();
     }
     // negative * (+, -, nz, t)
-    else if(isType(lhs, Negative.class)) {
+    else if(equal(lhs, Negative())) {
       // - * (nz, t) == t
-      if(isType(rhs, NonZero.class) || rhs == top()) {
+      if(equal(rhs, NonZero()) || rhs == top()) {
         return top();
       }
-      else return (isType(rhs, Negative.class)) ? reflect(Positive.class) : reflect(Negative.class);
+      else return (equal(rhs, Negative())) ? Positive() : Negative();
     }
     // pos * (+, -, nz, t)
-    else if(isType(lhs, Positive.class)) {
+    else if(equal(lhs, Positive())) {
       // + * (nz, t) == t
-      if(isType(rhs, NonZero.class) || rhs == top()) {
+      if(equal(rhs, NonZero()) || rhs == top()) {
         return top();
       }
-      else return (isType(rhs, Negative.class)) ? reflect(Negative.class) : reflect(Positive.class);
+      else return (equal(rhs, Negative())) ? Negative() : Positive();
     }
     else return top();
   }
   private AnnotationMirror divideTransfer(AnnotationMirror lhs, AnnotationMirror rhs) {
     // if either are bottom, or bottom has zero (T, 0), return error state (bottom)
-    if(rhs == bottom() || lhs == bottom() || rhs == top() || isType(rhs, Zero.class)) {
+    if(rhs == bottom() || lhs == bottom() || rhs == top() || equal(rhs, Zero())) {
       return bottom();
     }
     // T / anything == T
@@ -274,24 +285,24 @@ public class DivByZeroTransfer extends CFTransfer {
       return top();
     }
     // positive / 
-    else if(isType(lhs, Positive.class)) {
-      if(isType(rhs, NonZero.class)) {
+    else if(equal(lhs, Positive())) {
+      if(equal(rhs, NonZero())) {
         return top();
       }
-      else return isType(rhs, Positive.class) ? reflect(Positive.class) : reflect(Negative.class);
+      else return equal(rhs, Positive()) ? Positive() : Negative();
     }
     // negative /
-    else if(isType(lhs, Negative.class)) {
-      if(isType(rhs, NonZero.class)) {
+    else if(equal(lhs, Negative())) {
+      if(equal(rhs, NonZero())) {
         return top();
       }
-      else return isType(rhs, Positive.class) ? reflect(Negative.class) : reflect(Positive.class);
+      else return equal(rhs, Positive()) ? Negative() : Positive();
     }
     else return top();
   }
   private AnnotationMirror modTransfer(AnnotationMirror lhs, AnnotationMirror rhs) {
     // if either are bottom, or bottom has zero (T, 0), return error state (bottom)
-    if(rhs == bottom() || lhs == bottom() || rhs == top() || isType(rhs, Zero.class)) {
+    if(rhs == bottom() || lhs == bottom() || rhs == top() || equal(rhs, Zero())) {
       return bottom();
     }
     // T / anything == T
