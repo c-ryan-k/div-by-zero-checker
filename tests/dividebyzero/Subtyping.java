@@ -78,4 +78,22 @@ class SubtypeTest {
     // :: error: assignment
     @Zero Integer a = x;
   }
+
+  void positiveToNonZeroRelationshipShouldNotError(@Positive Integer x) {
+    @NonZero Integer a = x;
+  }
+
+  void negativeToNonZeroRelationshipShouldNotError(@Negative Integer x) {
+    @NonZero Integer a = x;
+  }
+
+  void nonZeroToPositiveRelationshipShouldError(@NonZero Integer x) {
+    // :: error: assignment
+    @Positive Integer a = x;
+  }
+
+  void nonZeroToNegativeRelationshipShouldError(@NonZero Integer x) {
+    // :: error: assignment
+    @Negative Integer a = x;
+  }
 }
