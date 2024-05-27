@@ -195,11 +195,11 @@ public class DivByZeroTransfer extends CFTransfer {
 
   private AnnotationMirror plusTransfer(AnnotationMirror lhs, AnnotationMirror rhs) {
     // if either are bottom, return bottom
-    if(rhs == bottom() || lhs == bottom()) {
+    if(equal(rhs, bottom()) || equal(lhs, bottom())) {
       return bottom();
     }
     // if either are top, return top
-    else if(rhs == top() || lhs == top()) {
+    else if(equal(rhs, top()) || equal(lhs, top())) {
       return top();
     }
     // if positive lhs, return positive if rhs is positive or zero, else top
@@ -214,17 +214,21 @@ public class DivByZeroTransfer extends CFTransfer {
     else if(equal(lhs, Zero())) {
       return rhs;
     }
+    // nonzero plus zero is nonzero, otherwise top
+    else if(equal(lhs, NonZero())) {
+      return equal(rhs, Zero()) ? NonZero() : top();
+    }
     // otherwise we don't know
     else return top();
   }
 
   private AnnotationMirror minusTransfer(AnnotationMirror lhs, AnnotationMirror rhs) {
     // if either are bottom, return bottom
-    if(rhs == bottom() || lhs == bottom()) {
+    if(equal(rhs, bottom()) || equal(lhs, bottom())) {
       return bottom();
     }
     // if either are top, return top
-    else if(rhs == top() || lhs == top()) {
+    else if(equal(rhs, top()) || equal(lhs, top())) {
       return top();
     }
     // if positive lhs, return positive if rhs is negative or zero, else top
@@ -244,13 +248,17 @@ public class DivByZeroTransfer extends CFTransfer {
       // zero - neg == pos, zero - pos == neg
       else return equal(rhs, Positive()) ? Negative() : Positive();
     }
+    // nonzero minus zero is nonzero, otherwise top
+    else if(equal(lhs, NonZero())) {
+      return equal(rhs, Zero()) ? NonZero() : top();
+    }
     // otherwise we don't know
     else return top();
   }
 
   private AnnotationMirror timesTransfer(AnnotationMirror lhs, AnnotationMirror rhs) {
     // if either are bottom, return bottom
-    if(rhs == bottom() || lhs == bottom()) {
+    if(equal(rhs, bottom()) || equal(lhs, bottom())) {
       return bottom();
     }
     // if either are zero, return zero
@@ -260,7 +268,7 @@ public class DivByZeroTransfer extends CFTransfer {
     // negative * (+, -, nz, t)
     else if(equal(lhs, Negative())) {
       // - * (nz, t) == t
-      if(equal(rhs, NonZero()) || rhs == top()) {
+      if(equal(rhs, NonZero()) || equal(rhs, top())) {
         return top();
       }
       else return (equal(rhs, Negative())) ? Positive() : Negative();
@@ -268,47 +276,78 @@ public class DivByZeroTransfer extends CFTransfer {
     // pos * (+, -, nz, t)
     else if(equal(lhs, Positive())) {
       // + * (nz, t) == t
-      if(equal(rhs, NonZero()) || rhs == top()) {
+      if(equal(rhs, NonZero()) || equal(rhs, top())) {
         return top();
       }
+      // pos * neg == neg, pos * pos == pos
       else return (equal(rhs, Negative())) ? Negative() : Positive();
+    }
+    else if(equal(lhs, NonZero())) {
+      // nz * top == top
+      if (equal(rhs, top())) {
+        return top();
+      }
+      // nz * bottom == bottom
+      else if (equal(rhs, bottom())) {
+        return bottom();
+      }
+      // nz * nonzero (neg, pos, nz) == nz
+      else if (equal(rhs, Negative()) || equal(rhs, Positive()) || equal(rhs, NonZero())) {
+        return NonZero();
+      }
+      // nz * zero == zero
+      else if (equal(rhs, Zero())) {
+        return Zero();
+      }
+      else return top();
     }
     else return top();
   }
   private AnnotationMirror divideTransfer(AnnotationMirror lhs, AnnotationMirror rhs) {
     // if either are bottom, or bottom has zero (T, 0), return error state (bottom)
-    if(rhs == bottom() || lhs == bottom() || rhs == top() || equal(rhs, Zero())) {
+    if(equal(rhs, bottom()) || equal(lhs, bottom()) || equal(rhs, top()) || equal(rhs, Zero())) {
       return bottom();
     }
     // T / anything == T
-    else if(lhs == top()) {
+    else if(equal(lhs, top())) {
       return top();
     }
     // positive / 
     else if(equal(lhs, Positive())) {
+      // pos / nz == top
       if(equal(rhs, NonZero())) {
         return top();
       }
+      // pos / pos == pos , pos / neg == neg
       else return equal(rhs, Positive()) ? Positive() : Negative();
     }
     // negative /
     else if(equal(lhs, Negative())) {
+      // neg / nz == top
       if(equal(rhs, NonZero())) {
         return top();
       }
+      // neg / pos == neg, neg / neg == pos
       else return equal(rhs, Positive()) ? Negative() : Positive();
+    }
+    // nonzero /
+    else if(equal(lhs, NonZero())) {
+      // nonzero divided by top, bottom, zero, is bottom
+      if (equal(rhs, bottom()) || equal(rhs, top()) || equal(rhs, Zero())) {
+        return bottom();
+      }
+      // otherwise, return top - neg/pos is top, (integer division n/z is top [1 / 7 == 0])
+      else return top();
     }
     else return top();
   }
+
   private AnnotationMirror modTransfer(AnnotationMirror lhs, AnnotationMirror rhs) {
     // if either are bottom, or bottom has zero (T, 0), return error state (bottom)
-    if(rhs == bottom() || lhs == bottom() || rhs == top() || equal(rhs, Zero())) {
+    if(equal(rhs, bottom()) || equal(lhs, bottom()) || equal(rhs, top()) || equal(rhs, Zero())) {
       return bottom();
     }
-    // T / anything == T
-    else if(lhs == top()) {
-      return top();
-    }
+    // mod is indeterminate for non-zero values - pos mod pos could be pos or zero, neg mod neg could be neg or zero, etc
     else return top();
   }
   // ========================================================================
