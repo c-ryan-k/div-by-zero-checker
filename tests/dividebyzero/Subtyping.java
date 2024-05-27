@@ -30,7 +30,12 @@ class SubtypeTest {
     @Bottom Integer f = x;
   }
 
-  void allToBottomRelationshipShouldError(@Top Integer a, @Positive Integer b, @Negative Integer c, @Zero Integer d, @NonZero Integer e) {
+  void allToBottomRelationshipShouldError(
+      @Top Integer a,
+      @Positive Integer b,
+      @Negative Integer c,
+      @Zero Integer d,
+      @NonZero Integer e) {
     // :: error: assignment
     @Bottom Integer m = a;
     // :: error: assignment
