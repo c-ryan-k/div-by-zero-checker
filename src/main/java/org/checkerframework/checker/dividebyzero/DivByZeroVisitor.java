@@ -1,7 +1,6 @@
 package org.checkerframework.checker.dividebyzero;
 
 import com.sun.source.tree.*;
-import com.sun.source.tree.Tree.Kind;
 import java.lang.annotation.Annotation;
 import java.util.EnumSet;
 import java.util.Set;
@@ -31,7 +30,6 @@ public class DivByZeroVisitor extends BaseTypeVisitor<DivByZeroAnnotatedTypeFact
     // A BinaryTree can represent any binary operator, including + or -.
     ExpressionTree left = node.getLeftOperand();
     ExpressionTree right = node.getRightOperand();
-    Kind kind = node.getKind();
     
     boolean right_is_int = isInt(right);
     boolean right_is_top = hasAnnotation(right, Top.class);
@@ -43,7 +41,7 @@ public class DivByZeroVisitor extends BaseTypeVisitor<DivByZeroAnnotatedTypeFact
       left == null || right == null ||
       // or we're doing integer division
           (
-              right_is_int && DIVISION_OPERATORS.contains(kind) && (
+              right_is_int && DIVISION_OPERATORS.contains(node.getKind()) && (
               // and right is top
               right_is_top ||
               // or it's bottom
@@ -68,7 +66,6 @@ public class DivByZeroVisitor extends BaseTypeVisitor<DivByZeroAnnotatedTypeFact
     // such as "x += 10".
     ExpressionTree right = node.getExpression();
     ExpressionTree left = node.getVariable();
-    Kind kind = node.getKind();
     
     boolean right_is_int = isInt(right);
     boolean right_is_top = hasAnnotation(right, Top.class);
@@ -80,7 +77,7 @@ public class DivByZeroVisitor extends BaseTypeVisitor<DivByZeroAnnotatedTypeFact
       left == null || right == null ||
       // or we're doing integer division
           (
-              right_is_int && DIVISION_OPERATORS.contains(kind) && (
+              right_is_int && DIVISION_OPERATORS.contains(node.getKind()) && (
               // and right is top
               right_is_top ||
               // or it's bottom
