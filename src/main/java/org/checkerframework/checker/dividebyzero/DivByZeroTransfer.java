@@ -48,6 +48,13 @@ public class DivByZeroTransfer extends CFTransfer {
     MOD
   }
 
+  private AnnotationMirror Zero = reflect(Zero.class);
+  private AnnotationMirror Negative = reflect(Negative.class);
+  private AnnotationMirror Positive = reflect(Positive.class);
+  private AnnotationMirror NonZero = reflect(NonZero.class);
+  private AnnotationMirror Bottom = bottom();
+  private AnnotationMirror Top = top();
+
   // ========================================================================
   // Transfer functions to implement
 
@@ -75,9 +82,68 @@ public class DivByZeroTransfer extends CFTransfer {
    * @return a refined type for lhs
    */
   private AnnotationMirror refineLhsOfComparison(
-      Comparison operator, AnnotationMirror lhs, AnnotationMirror rhs) {
-    // TODO
-    return lhs;
+    Comparison operator, AnnotationMirror lhs, AnnotationMirror rhs) {
+    switch (operator) {
+      case LT:
+        // anything less than zero or negative is negative
+        if (equal(rhs, Zero) || equal(rhs, Negative)) {
+          return Negative;
+        }
+        // anything less than top / positive / NZ is unknown
+        else if (rhs == Top || equal(rhs, Positive) || equal(rhs, NonZero)) {
+          return Top;
+        }
+        // bottom is empty
+        else if (rhs == Bottom) {
+          return rhs;
+        }
+        break;
+      case GT:
+        if (equal(rhs, Zero) || equal(rhs, Positive)) {
+          return Positive;
+        }
+        else if (rhs == Top || equal(rhs, NonZero) || equal(rhs, Negative)) {
+          return Top;
+        }
+        else if (rhs == Bottom) {
+          return rhs;
+        }
+        break;
+      case NE:
+        // if x != 0, x == nz
+        if(equal(rhs, Zero)) {
+          return NonZero;
+        }
+        else {
+          return glb(rhs, lhs);
+        }
+      case EQ:
+        return lub(rhs, lhs);
+      case GE:
+        if (equal(rhs, Positive)) {
+          return rhs;
+        }
+        else if (rhs == Bottom) {
+          return Bottom;
+        }
+        else {
+          return Top;
+        }
+      case LE:
+        if (equal(rhs, Negative)) {
+          return rhs;
+        }
+        else if (rhs == Bottom) {
+          return rhs;
+        }
+        else {
+          return Top;
+        }
+      default:
+        // default - we dunno
+        return lub(rhs, lhs);
+    }
+    return Bottom;
   }
 
   /**
@@ -97,10 +163,179 @@ public class DivByZeroTransfer extends CFTransfer {
    */
   private AnnotationMirror arithmeticTransfer(
       BinaryOperator operator, AnnotationMirror lhs, AnnotationMirror rhs) {
-    // TODO
+    switch (operator) {
+      case PLUS:
+        return plusTransfer(lhs, rhs);
+      case MINUS:
+        return minusTransfer(lhs, rhs);
+      case TIMES:
+        return timesTransfer(lhs, rhs);
+      case DIVIDE:
+        return divideTransfer(lhs, rhs);
+      case MOD:
+        return modTransfer(lhs, rhs);
+    }
     return top();
   }
 
+
+  private AnnotationMirror plusTransfer(AnnotationMirror lhs, AnnotationMirror rhs) {
+    // if either are bottom, return bottom
+    if(equal(rhs, Bottom) || equal(lhs, Bottom)) {
+      return Bottom;
+    }
+    // if either are top, return top
+    else if(equal(rhs, Top) || equal(lhs, Top)) {
+      return Top;
+    }
+    // if positive lhs, return positive if rhs is positive or zero, else top
+    else if(equal(lhs, Positive)) {
+      return (equal(rhs, Positive) || equal(rhs, Zero)) ? Positive : Top;
+    }
+    // if negative lhs, return hegative if rhs is negative or zero, else top
+    else if(equal(lhs, Negative)) {
+      return (equal(rhs, Negative) || equal(rhs, Zero)) ? Negative : Top;
+    }
+    // zero plus anything is that anything
+    else if(equal(lhs, Zero)) {
+      return rhs;
+    }
+    // nonzero plus zero is nonzero, otherwise top
+    else if(equal(lhs, NonZero)) {
+      return equal(rhs, Zero) ? NonZero : Top;
+    }
+    // otherwise we don't know
+    else return Top;
+  }
+
+  private AnnotationMirror minusTransfer(AnnotationMirror lhs, AnnotationMirror rhs) {
+    // if either are bottom, return bottom
+    if(equal(rhs, Bottom) || equal(lhs, Bottom)) {
+      return Bottom;
+    }
+    // if either are top, return top
+    else if(equal(rhs, Top) || equal(lhs, Top)) {
+      return Top;
+    }
+    // if positive lhs, return positive if rhs is negative or zero, else top
+    else if(equal(lhs, Positive)) {
+      return (equal(rhs, Negative) || equal(rhs, Zero)) ? Positive : Top;
+    }
+    // if negative lhs, return negative if rhs is positive or zero, else top
+    else if(equal(lhs, Negative)) {
+      return (equal(rhs, Positive) || equal(rhs, Zero)) ? Negative : Top;
+    }
+    // zero minus something
+    else if(equal(lhs, Zero)) {
+      // 0 - 0 == 0
+      if(equal(rhs, Zero)) {
+        return Zero;
+      }
+      // zero - neg == pos, zero - pos == neg
+      else return equal(rhs, Positive) ? Negative : Positive;
+    }
+    // nonzero minus zero is nonzero, otherwise top
+    else if(equal(lhs, NonZero)) {
+      return equal(rhs, Zero) ? NonZero : Top;
+    }
+    // otherwise we don't know
+    else return Top;
+  }
+
+  private AnnotationMirror timesTransfer(AnnotationMirror lhs, AnnotationMirror rhs) {
+    // if either are bottom, return bottom
+    if(equal(rhs, Bottom) || equal(lhs, Bottom)) {
+      return Bottom;
+    }
+    // if either are zero, return zero
+    else if(equal(rhs, Zero) || equal(lhs, Zero)) {
+      return Zero;
+    }
+    // negative * (pos, neg, nz, t)
+    else if(equal(lhs, Negative)) {
+      // neg * (nz, t) == t
+      if(equal(rhs, NonZero) || equal(rhs, Top)) {
+        return Top;
+      }
+      else return (equal(rhs, Negative)) ? Positive : Negative;
+    }
+    // pos * (pos, neg, nz, t)
+    else if(equal(lhs, Positive)) {
+      // pos * (nz, t) == t
+      if(equal(rhs, NonZero) || equal(rhs, Top)) {
+        return Top;
+      }
+      // pos * neg == neg, pos * pos == pos
+      else return (equal(rhs, Negative)) ? Negative : Positive;
+    }
+    else if(equal(lhs, NonZero)) {
+      // nz * top == top
+      if (equal(rhs, Top)) {
+        return Top;
+      }
+      // nz * bottom == bottom
+      else if (equal(rhs, Bottom)) {
+        return Bottom;
+      }
+      // nz * nonzero (neg, pos, nz) == nz
+      else if (equal(rhs, Negative) || equal(rhs, Positive) || equal(rhs, NonZero)) {
+        return NonZero;
+      }
+      // nz * zero == zero
+      else if (equal(rhs, Zero)) {
+        return Zero;
+      }
+      else return Top;
+    }
+    else return Top;
+  }
+  private AnnotationMirror divideTransfer(AnnotationMirror lhs, AnnotationMirror rhs) {
+    // if either are bottom, or bottom has zero (T, 0), return error state (bottom)
+    if(equal(rhs, Bottom) || equal(lhs, Bottom) || equal(rhs, Top) || equal(rhs, Zero)) {
+      return Bottom;
+    }
+    // T / anything == T
+    else if(equal(lhs, Top)) {
+      return Top;
+    }
+    // positive / 
+    else if(equal(lhs, Positive)) {
+      // pos / nz == top
+      if(equal(rhs, NonZero)) {
+        return Top;
+      }
+      // pos / pos == pos , pos / neg == neg
+      else return equal(rhs, Positive) ? Positive : Negative;
+    }
+    // negative /
+    else if(equal(lhs, Negative)) {
+      // neg / nz == top
+      if(equal(rhs, NonZero)) {
+        return Top;
+      }
+      // neg / pos == neg, neg / neg == pos
+      else return equal(rhs, Positive) ? Negative : Positive;
+    }
+    // nonzero /
+    else if(equal(lhs, NonZero)) {
+      // nonzero divided by top, bottom, zero, is bottom
+      if (equal(rhs, Bottom) || equal(rhs, Top) || equal(rhs, Zero)) {
+        return Bottom;
+      }
+      // otherwise, return top: neg/pos is top, (integer division n/z is top [1 / 7 == 0])
+      else return Top;
+    }
+    else return Top;
+  }
+
+  private AnnotationMirror modTransfer(AnnotationMirror lhs, AnnotationMirror rhs) {
+    // if either are bottom, or bottom has zero (T, 0), return error state (bottom)
+    if(equal(rhs, Bottom) || equal(lhs, Bottom) || equal(rhs, Top) || equal(rhs, Zero)) {
+      return Bottom;
+    }
+    // mod is indeterminate for non-zero values: pos % pos could be pos or zero, neg % neg could be neg or zero, etc
+    else return Top;
+  }
   // ========================================================================
   // Useful helpers
 
