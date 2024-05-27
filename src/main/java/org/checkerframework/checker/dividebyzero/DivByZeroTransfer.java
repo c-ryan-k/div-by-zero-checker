@@ -94,7 +94,7 @@ public class DivByZeroTransfer extends CFTransfer {
           return Top;
         }
         // bottom is empty
-        else if (rhs == bottom()) {
+        else if (rhs == Bottom) {
           return rhs;
         }
         break;
@@ -105,7 +105,7 @@ public class DivByZeroTransfer extends CFTransfer {
         else if (rhs == Top || equal(rhs, NonZero) || equal(rhs, Negative)) {
           return Top;
         }
-        else if (rhs == bottom()) {
+        else if (rhs == Bottom) {
           return rhs;
         }
         break;
@@ -123,8 +123,8 @@ public class DivByZeroTransfer extends CFTransfer {
         if (equal(rhs, Positive)) {
           return rhs;
         }
-        else if (rhs == bottom()) {
-          return bottom();
+        else if (rhs == Bottom) {
+          return Bottom;
         }
         else {
           return Top;
@@ -133,7 +133,7 @@ public class DivByZeroTransfer extends CFTransfer {
         if (equal(rhs, Negative)) {
           return rhs;
         }
-        else if (rhs == bottom()) {
+        else if (rhs == Bottom) {
           return rhs;
         }
         else {
@@ -181,8 +181,8 @@ public class DivByZeroTransfer extends CFTransfer {
 
   private AnnotationMirror plusTransfer(AnnotationMirror lhs, AnnotationMirror rhs) {
     // if either are bottom, return bottom
-    if(equal(rhs, bottom()) || equal(lhs, bottom())) {
-      return bottom();
+    if(equal(rhs, Bottom) || equal(lhs, Bottom)) {
+      return Bottom;
     }
     // if either are top, return top
     else if(equal(rhs, Top) || equal(lhs, Top)) {
