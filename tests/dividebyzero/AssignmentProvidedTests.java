@@ -102,4 +102,47 @@ class AssignmentProvidedTests {
     // :: error: divide.by.zero
     q = (q <= 0) ? q / q : q / 2;
   }
+
+  public static void n(int q) {
+    int s = 2;
+    for(int i = 0; i < q; i++) {
+      s -= 1;
+    }
+    int x = 0;
+    // S is 'top'
+    // :: error: divide.by.zero
+    x /= s;
+    // :: error: divide.by.zero
+    x /= (s + 1);
+
+    // s is positive
+    s = 1;
+    for(int i = 0; i < q; i++) {
+      s++;
+    }
+    x /= s;
+
+    // s is negative
+    s = -2;
+    for(int i = 0; i < q; i++) {
+      s--;
+    }
+    x /= s;
+
+    s = 2;
+    //s is nonzero
+    for(int i = 0; i < q; i++) {
+      s = s * -1;
+    }
+    x = 1 / s;
+
+    if (q <= 0) {
+      // :: error: divide.by.zero
+      s %= q;
+    } 
+    if (q >= 0) {
+      // :: error: divide.by.zero
+      s %= q;
+    }
+  }
 }
